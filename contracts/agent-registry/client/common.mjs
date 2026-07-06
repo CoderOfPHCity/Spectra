@@ -1,19 +1,27 @@
-// Shared helpers for the AgentRegistry deploy/interaction scripts.
-//
+import { createRequire } from 'module'
 import { readFileSync } from 'fs'
 import dotenv from 'dotenv'
 dotenv.config()
+
+const require = createRequire(import.meta.url)
 
 export const CSPR_NODE_RPC = process.env.CSPR_NODE_RPC || 'https://node.testnet.cspr.cloud'
 export const NETWORK_NAME  = process.env.CASPER_NETWORK_NAME || 'casper-test'
 export const KEY_PATH      = process.env.DEPLOYER_PRIVATE_KEY_PATH || './keys/secret_key.pem'
 
-export async function loadSdk() {
-  return import('casper-js-sdk')
+export function loadSdk() {
+  const sdk = require('casper-js-sdk')
+  if (typeof sdk.CasperClient !== 'function') {
+    throw new Error(
+      'casper-js-sdk loaded but CasperClient is missing. Run ' +
+      '`cat node_modules/casper-js-sdk/package.json | grep version` to check what\'s installed.'
+    )
+  }
+  return sdk
 }
 
-export async function loadKeyPair() {
-  const { Keys } = await loadSdk()
+export function loadKeyPair() {
+  const { Keys } = loadSdk()
   return Keys.Ed25519.loadKeyPairFromPrivateFile(KEY_PATH)
 }
 
@@ -21,13 +29,6 @@ export function readWasm(path = '../agent-registry.wasm') {
   return new Uint8Array(readFileSync(new URL(path, import.meta.url)))
 }
 
-/**
- * Looks up an account's main purse URef via the node's RPC — needed any
- * time an entry point (like register_agent) wants to pull CSPR from the
- * caller's own purse. The caller must be the one invoking the deploy,
- * since only they hold sufficient access rights on their main purse
- * URef to pass it as a usable argument.
- */
 export async function getMainPurse(client, publicKey) {
   const stateRootHash = await client.nodeClient.getStateRootHash()
   const accountInfo = await client.nodeClient.getBlockState(

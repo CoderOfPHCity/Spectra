@@ -12,14 +12,13 @@
 //      PAYMENT_AMOUNT below once you know your actual gas cost.
 
 import { loadSdk, loadKeyPair, readWasm, waitForDeploy, CSPR_NODE_RPC, NETWORK_NAME } from './common.mjs'
-import pkg from 'casper-js-sdk'
-const { CasperClient, DeployUtil, RuntimeArgs, CLValueBuilder, Keys } = pkg
+
 const PAYMENT_AMOUNT = BigInt(process.env.INSTALL_PAYMENT_MOTES || '150000000000') // 150 CSPR
 
 async function main() {
-  const { CasperClient, DeployUtil } = await loadSdk()
+  const { CasperClient, DeployUtil } = loadSdk()
   const client = new CasperClient(CSPR_NODE_RPC)
-  const keyPair = await loadKeyPair()
+  const keyPair = loadKeyPair()
 
   const wasm = readWasm('../agent-registry.wasm')
 
