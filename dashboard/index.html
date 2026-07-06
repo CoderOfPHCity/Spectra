@@ -775,14 +775,16 @@
     }
 
     const paymentPayload = {
-      scheme:  requirements.scheme,
-      network: requirements.network,
-      payload: {
-        signature:     signResult.signatureHex,
-        authorization,
-        signer:        publicKeyHex,
-      },
-    }
+  x402Version: 2,
+  scheme: requirements.scheme,
+  network: requirements.network,
+  payload: {
+    x402Version: 2,
+    signature: signResult.signatureHex,
+    authorization,
+    signer: publicKeyHex,
+  },
+}
 
     const xPaymentHeader = btoa(JSON.stringify(paymentPayload))
 

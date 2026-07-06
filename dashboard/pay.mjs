@@ -98,7 +98,7 @@ export async function payAndAnalyze({ tokenIn, tokenOut, amount }, onStatus = ()
   const domain = {
     name: requirements.extra?.name || 'Spectra Routing Guard',
     version: requirements.extra?.version || '1',
-    chain_name: requirements.network, // already CAIP-2 form, e.g. "casper:testnet"
+    chain_name: requirements.network, // already CAIP-2 form, e.g. "casper:casper-test"
   }
 
   const digest = hashTypedData(domain, TransferAuthorizationTypes, 'TransferAuthorization', authorization)
@@ -111,9 +111,11 @@ export async function payAndAnalyze({ tokenIn, tokenOut, amount }, onStatus = ()
   }
 
   const paymentPayload = {
+    x402Version: 2,
     scheme: requirements.scheme,
     network: requirements.network,
     payload: {
+      x402Version: 2,
       signature: signResult.signatureHex,
       authorization,
       signer: publicKeyHex,

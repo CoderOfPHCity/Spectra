@@ -14,7 +14,7 @@ import {
 const REGISTRY_HASH = process.env.AGENT_REGISTRY_HASH
 const AGENT_ID       = process.env.AGENT_ID || 'spectra-routing-guard-v1'
 const STAKE_MOTES    = BigInt(process.env.STAKE_MOTES || '0')
-const PAYMENT_AMOUNT = BigInt(process.env.PAYMENT_MOTES || '3000000000') // 3 CSPR gas
+const PAYMENT_AMOUNT = BigInt(process.env.PAYMENT_MOTES || '1000000000') // 1 CSPR gas
 
 async function main() {
   if (!REGISTRY_HASH) throw new Error('Set AGENT_REGISTRY_HASH first (see install.mjs output)')

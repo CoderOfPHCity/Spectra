@@ -45,6 +45,9 @@ const REGISTRY_HASH    = process.env.AGENT_REGISTRY_HASH || ''
 const CSPR_NODE_RPC    = process.env.CSPR_NODE_RPC  || 'https://node.testnet.cspr.cloud'
 const X402_FACILITATOR = process.env.X402_FACILITATOR || 'https://x402-facilitator.cspr.cloud'
 const MCP_URL          = process.env.CSPR_TRADE_MCP_URL || 'https://mcp.cspr.trade/mcp'
+const CSPR_CLOUD_TOKEN =
+  process.env.CSPR_CLOUD_TOKEN ||
+  "55f79117-fc4d-4d60-9956-65423f39a06a"
 
 const ROUTING_FEE_MOTES = BigInt(process.env.ROUTING_FEE_MOTES || '100000000') // 0.1 CSPR
 const IMPACT_WARN       = parseFloat(process.env.IMPACT_WARN || '1.0')   // % warn
@@ -113,18 +116,14 @@ class RoutingGuardAgent extends EventEmitter {
   buildPaymentRequirements(requestId) {
     return {
       scheme:            'exact',
-      network:           'casper:testnet',
+      network:           'casper:casper-test',
       maxAmountRequired: ROUTING_FEE_MOTES.toString(),
       resource:          `spectra:routing:${requestId}`,
       description:       'Spectra routing analysis fee — 0.1 CSPR',
       mimeType:          'application/json',
       payTo:             AGENT_WALLET,
       maxTimeoutSeconds: 60,
-      asset: {
-        type:     'native',
-        symbol:   'CSPR',
-        decimals: 9,
-      },
+      asset: 'CSPR',
       extra: {
         name:        'Spectra Routing Guard',
         version:     '1',
@@ -141,16 +140,36 @@ class RoutingGuardAgent extends EventEmitter {
   async verifyPayment(paymentHeader, requirements) {
     try {
       const paymentPayload = decodePaymentHeader(paymentHeader)
+  
       const res = await axios.post(
         `${X402_FACILITATOR}/verify`,
-        { x402Version: 1, paymentPayload, paymentRequirements: requirements },
-        { timeout: 10000 }
+        {
+          x402Version: 2,
+          paymentPayload,
+          paymentRequirements: requirements,
+        },
+        {
+          timeout: 10000,
+          headers: {
+            Authorization: CSPR_CLOUD_TOKEN,
+          },
+        }
       )
-      // Field name isn't 100% confirmed across facilitator implementations —
-      // check both spellings seen in the wild.
-      return res.data?.isValid === true || res.data?.valid === true
+  
+      log(`[x402] verify response ${JSON.stringify(res.data)}`)
+  
+      return (
+        res.data?.isValid === true ||
+        res.data?.valid === true
+      )
     } catch (err) {
-      log(`[x402] verify error: ${err.response?.data ? JSON.stringify(err.response.data) : err.message}`)
+      log(
+        `[x402] verify error: ${
+          err.response?.data
+            ? JSON.stringify(err.response.data)
+            : err.message
+        }`
+      )
       return false
     }
   }
@@ -159,21 +178,46 @@ class RoutingGuardAgent extends EventEmitter {
   async settlePayment(paymentHeader, requirements) {
     try {
       const paymentPayload = decodePaymentHeader(paymentHeader)
+  
       const res = await axios.post(
         `${X402_FACILITATOR}/settle`,
-        { x402Version: 1, paymentPayload, paymentRequirements: requirements },
-        { timeout: 20000 }
+        {
+          x402Version: 2,
+          paymentPayload,
+          paymentRequirements: requirements,
+        },
+        {
+          timeout: 20000,
+          headers: {
+            Authorization: CSPR_CLOUD_TOKEN,
+          },
+        }
       )
+  
+      log(`[x402] settle response ${JSON.stringify(res.data)}`)
+  
       return {
         success: res.data?.success === true,
-        deployHash: res.data?.transaction || res.data?.deployHash || null,
+        deployHash:
+          res.data?.transaction ||
+          res.data?.deployHash ||
+          null,
       }
     } catch (err) {
-      log(`[x402] settle error: ${err.response?.data ? JSON.stringify(err.response.data) : err.message}`)
-      return { success: false, deployHash: null }
+      log(
+        `[x402] settle error: ${
+          err.response?.data
+            ? JSON.stringify(err.response.data)
+            : err.message
+        }`
+      )
+  
+      return {
+        success: false,
+        deployHash: null,
+      }
     }
   }
-
   // ── Core analysis ─────────────────────────────────────────────────────────
   async analyzeRoute({ tokenIn, tokenOut, amount, senderPublicKey }) {
     const jobId = randomUUID().slice(0, 8)
@@ -480,7 +524,7 @@ async function x402Gate(req, res, next) {
     })
     return res.status(402).json({
       error: 'Payment Required',
-      x402Version: 1,
+      x402Version: 2,
       requestId: newId,
       accepts: [requirements],
     })
@@ -495,10 +539,10 @@ async function x402Gate(req, res, next) {
 
   const { requirements } = pending
   const valid = await agent.verifyPayment(paymentHeader, requirements)
-  if (!valid) return res.status(402).json({ error: 'Invalid payment', x402Version: 1 })
+  if (!valid) return res.status(402).json({ error: 'Invalid payment', x402Version: 2 })
 
   const settlement = await agent.settlePayment(paymentHeader, requirements)
-  if (!settlement.success) return res.status(402).json({ error: 'Settlement failed', x402Version: 1 })
+  if (!settlement.success) return res.status(402).json({ error: 'Settlement failed', x402Version: 2 })
 
   pendingRequirements.delete(requestId)
   agent.stats.requestsPaid++
@@ -518,7 +562,7 @@ app.post('/route', x402Gate, async (req, res) => {
       amount: parseFloat(amount), senderPublicKey: sender_public_key,
     })
     if (req.deployHash)
-      res.setHeader('X-PAYMENT-RESPONSE', JSON.stringify({ success: true, deployHash: req.deployHash, network: 'casper:testnet' }))
+      res.setHeader('X-PAYMENT-RESPONSE', JSON.stringify({ success: true, deployHash: req.deployHash, network: 'casper:casper-test' }))
     res.json(result)
   } catch (err) {
     res.status(500).json({ error: err.message })

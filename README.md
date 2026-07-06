@@ -63,24 +63,12 @@ Put the resulting contract hash into `agent/.env` as
 (or a delegated) key the agent should sign `update_reputation` deploys
 with.
 
-**Before you deploy for real:** the contract was written to the
-documented shape of `casper-contract 4.0` / `casper-types 4.0.3` but
-has not been compiled in this sandboxed environment (no network access
-to fetch crates.io dependencies here). Run `cargo build --release
---target wasm32-unknown-unknown` locally first and fix up anything that
-drifted against your exact pinned versions — see the comment at the top
-of `contracts/agent-registry/src/main.rs` for the one spot
-(`storage::new_locked_contract`'s argument count) most likely to need a
-small adjustment across point releases. The same caveat applies to the
-casper-js-sdk client scripts in `contracts/agent-registry/client/` —
-they're written to the documented v2 API shape but unverified against a
-live node from here.
 
 ## What's deliberately out of scope for this MVP
 
 - **No yield-monitor agent / LP reallocation.** The decision doc scoped
   this down to a single agent (Routing Guard). `optimal_liquidity_amounts`
-  and the LP-related MCP tools are under development.
+  and the LP-related MCP tools are **under development**.
 - **No private key handling for end users.** Users pay via their own
   Casper wallet extension; the agent's private key (`AGENT_PRIVATE_KEY_PATH`)
   is only ever used to sign the agent's own `update_reputation` deploys.

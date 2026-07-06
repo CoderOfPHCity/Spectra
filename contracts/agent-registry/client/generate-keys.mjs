@@ -18,10 +18,6 @@ function main() {
 
   console.log('Public key (hex):')
   console.log(`  ${publicKeyHex}`)
-  console.log('')
-  console.log('1. Fund at https://testnet.cspr.live -> Faucet (paste the hex above)')
-  console.log('2. Set AGENT_WALLET_PUBLIC_KEY to that hex in agent/.env')
-  console.log('3. Copy this keys/ folder into agent/ (or point AGENT_PRIVATE_KEY_PATH here)')
 }
 
 main()
