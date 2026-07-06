@@ -14,7 +14,11 @@
  *   Agent updates reputation on the Casper AgentRegistry contract
  *   Returns: { recommendation, quote, impact, optimalSize, agentScore }
  *
-       This version stores the exact
+ * NOTE ON HARDENING vs. the original MVP sketch:
+ *   - The original 402 → verify/settle flow rebuilt PaymentRequirements
+ *     with a different resource id at each step ("verify" as a literal
+ *     string), so the object the facilitator validated against didn't
+ *     match what the client was quoted. This version stores the exact
  *     PaymentRequirements issued for each requestId and requires the
  *     client to echo that id back, so verify/settle always check the
  *     payment against the requirements the client actually saw.
@@ -83,6 +87,12 @@ function extractImpact(data) {
   )
 }
 
+// X-PAYMENT is base64-encoded JSON per the x402 spec — the facilitator
+// expects the decoded object, not the raw header string.
+function decodePaymentHeader(paymentHeader) {
+  return JSON.parse(Buffer.from(paymentHeader, 'base64').toString('utf-8'))
+}
+
 // ── Agent ─────────────────────────────────────────────────────────────────────
 class RoutingGuardAgent extends EventEmitter {
   constructor() {
@@ -124,16 +134,23 @@ class RoutingGuardAgent extends EventEmitter {
   }
 
   // ── x402: verify with CSPR.cloud facilitator ─────────────────────────────
+  // Per the x402 spec, the facilitator expects the DECODED payment payload
+  // (X-PAYMENT is base64-encoded JSON), not the raw header string, under
+  // {x402Version, paymentPayload, paymentRequirements} — not the informal
+  // {paymentHeader, requirements} shape this used to send.
   async verifyPayment(paymentHeader, requirements) {
     try {
+      const paymentPayload = decodePaymentHeader(paymentHeader)
       const res = await axios.post(
         `${X402_FACILITATOR}/verify`,
-        { paymentHeader, requirements },
+        { x402Version: 1, paymentPayload, paymentRequirements: requirements },
         { timeout: 10000 }
       )
-      return res.data?.valid === true
+      // Field name isn't 100% confirmed across facilitator implementations —
+      // check both spellings seen in the wild.
+      return res.data?.isValid === true || res.data?.valid === true
     } catch (err) {
-      log(`[x402] verify error: ${err.message}`)
+      log(`[x402] verify error: ${err.response?.data ? JSON.stringify(err.response.data) : err.message}`)
       return false
     }
   }
@@ -141,14 +158,18 @@ class RoutingGuardAgent extends EventEmitter {
   // ── x402: settle onchain via facilitator ──────────────────────────────────
   async settlePayment(paymentHeader, requirements) {
     try {
+      const paymentPayload = decodePaymentHeader(paymentHeader)
       const res = await axios.post(
         `${X402_FACILITATOR}/settle`,
-        { paymentHeader, requirements },
+        { x402Version: 1, paymentPayload, paymentRequirements: requirements },
         { timeout: 20000 }
       )
-      return { success: res.data?.success === true, deployHash: res.data?.deployHash || null }
+      return {
+        success: res.data?.success === true,
+        deployHash: res.data?.transaction || res.data?.deployHash || null,
+      }
     } catch (err) {
-      log(`[x402] settle error: ${err.message}`)
+      log(`[x402] settle error: ${err.response?.data ? JSON.stringify(err.response.data) : err.message}`)
       return { success: false, deployHash: null }
     }
   }
@@ -334,9 +355,15 @@ class RoutingGuardAgent extends EventEmitter {
       return
     }
 
+    // Build Casper deploy — requires casper-js-sdk. Loaded via require()
+    // rather than import() because casper-js-sdk (2.x) is a CommonJS
+    // package and Node's ESM interop can silently fail to resolve named
+    // exports like CasperClient (surfacing as "CasperClient is not a
+    // constructor") — require() sidesteps that.
     try {
-      const { CasperClient, DeployUtil, RuntimeArgs, CLValueBuilder, Keys } =
-        await import('casper-js-sdk')
+      const { createRequire } = await import('module')
+      const require = createRequire(import.meta.url)
+      const { CasperClient, DeployUtil, RuntimeArgs, CLValueBuilder, Keys } = require('casper-js-sdk')
 
       const client  = new CasperClient(CSPR_NODE_RPC)
       const keyPair = Keys.Ed25519.loadKeyPairFromPrivateFile(
@@ -500,6 +527,36 @@ app.post('/route', x402Gate, async (req, res) => {
 
 app.get('/api/status',  (req, res) => res.json(agent.getStatus()))
 app.get('/health',      (req, res) => res.json({ ok: true }))
+app.get('/pay.mjs', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript')
+  try {
+    res.send(readFileSync(join(__dirname, '../dashboard/pay.mjs'), 'utf-8'))
+  } catch {
+    res.status(404).send('// pay.mjs not found')
+  }
+})
+
+// ── Demo-only route (bypasses x402) ───────────────────────────────────────────
+// For recording a walkthrough without wiring up a live wallet-signing flow.
+// Shows the exact same analysis pipeline and dashboard updates as /route —
+// just skips the payment gate. NOT mounted unless DEMO_MODE=true, and never
+// intended for production use (anyone could call it for free).
+if (process.env.DEMO_MODE === 'true') {
+  log('⚠ DEMO_MODE=true — /demo/route is live and bypasses x402. Do not deploy this way.')
+  app.post('/demo/route', async (req, res) => {
+    const { token_in, token_out, amount } = req.body
+    if (!token_in || !token_out || !amount)
+      return res.status(400).json({ error: 'token_in, token_out, amount required' })
+    try {
+      const result = await agent.analyzeRoute({
+        tokenIn: token_in, tokenOut: token_out, amount: parseFloat(amount),
+      })
+      res.json({ ...result, note: 'DEMO_MODE — x402 payment was skipped for this call' })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+}
 
 // Serve dashboard
 import { readFileSync } from 'fs'

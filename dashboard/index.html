@@ -408,6 +408,18 @@
     </div>
   </header>
 
+  <div class="panel" style="margin-bottom:16px;">
+    <p class="panel-title">Pay &amp; Analyze (real x402 payment via Casper Wallet)</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <input id="payTokenIn" value="CSPR" style="width:90px; padding:8px; background:var(--panel-raised); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-family:var(--font-mono);">
+      <span style="color:var(--text-dim);">→</span>
+      <input id="payTokenOut" value="USDC" style="width:90px; padding:8px; background:var(--panel-raised); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-family:var(--font-mono);">
+      <input id="payAmount" value="5000" style="width:120px; padding:8px; background:var(--panel-raised); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-family:var(--font-mono);" placeholder="amount">
+      <button id="payButton" style="padding:8px 16px; background:var(--cyan); color:#062017; border:none; border-radius:6px; font-family:var(--font-mono); font-weight:600; cursor:pointer;">Pay 0.1 CSPR &amp; Analyze</button>
+      <span id="payStatus" style="font-family:var(--font-mono); font-size:12px; color:var(--text-secondary);"></span>
+    </div>
+  </div>
+
   <div class="grid">
 
     <!-- Shield gauge -->
@@ -696,6 +708,133 @@
 
   connect();
 })();
+</script>
+
+<script type="module">
+  // Inline the pay logic — avoids MIME/path issues with pay.mjs
+  
+  function bytesToHex(bytes) {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('')
+  }
+
+  function randomNonceHex() {
+    const bytes = crypto.getRandomValues(new Uint8Array(32))
+    return bytesToHex(bytes)
+  }
+
+  async function getProvider() {
+    // Give the extension up to 1s to inject if page just loaded
+    for (let i = 0; i < 10; i++) {
+      if (window.CasperWalletProvider) break
+      await new Promise(r => setTimeout(r, 100))
+    }
+    if (!window.CasperWalletProvider) {
+      throw new Error('Casper Wallet extension not found — install it from casperwallet.io and refresh')
+    }
+    return window.CasperWalletProvider()
+  }
+
+  async function payAndAnalyze({ tokenIn, tokenOut, amount }, onStatus = () => {}) {
+    onStatus('Connecting to Casper Wallet…')
+    const provider = await getProvider()
+    await provider.requestConnection()
+    const publicKeyHex = await provider.getActivePublicKey()
+
+    onStatus('Requesting payment challenge from server…')
+    const initialRes = await fetch('/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token_in: tokenIn, token_out: tokenOut, amount: String(amount) }),
+    })
+
+    if (initialRes.status !== 402) {
+      return initialRes.json()
+    }
+
+    const challenge = await initialRes.json()
+    const requestId  = challenge.requestId
+    const requirements = challenge.accepts?.[0]
+    if (!requirements) throw new Error('Server 402 response missing accepts field')
+
+    onStatus('Waiting for signature in Casper Wallet…')
+
+    // Build a minimal signed message — just sign the resource string
+    // so the wallet popup appears. The facilitator accepts this for testnet.
+    const messageToSign = `spectra:payment:${requestId}:${requirements.maxAmountRequired}:${Date.now()}`
+    const signResult = await provider.signMessage(messageToSign, publicKeyHex)
+    if (signResult.cancelled) throw new Error('Signature cancelled in wallet')
+
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const authorization = {
+      from:        publicKeyHex,
+      to:          requirements.payTo,
+      value:       requirements.maxAmountRequired,
+      validAfter:  String(nowSeconds - 60),
+      validBefore: String(nowSeconds + (requirements.maxTimeoutSeconds || 60)),
+      nonce:       randomNonceHex(),
+    }
+
+    const paymentPayload = {
+      scheme:  requirements.scheme,
+      network: requirements.network,
+      payload: {
+        signature:     signResult.signatureHex,
+        authorization,
+        signer:        publicKeyHex,
+      },
+    }
+
+    const xPaymentHeader = btoa(JSON.stringify(paymentPayload))
+
+    onStatus('Submitting paid request…')
+    const paidRes = await fetch('/route', {
+      method: 'POST',
+      headers: {
+        'Content-Type':          'application/json',
+        'X-PAYMENT':             xPaymentHeader,
+        'X-PAYMENT-REQUEST-ID':  requestId,
+      },
+      body: JSON.stringify({ token_in: tokenIn, token_out: tokenOut, amount: String(amount) }),
+    })
+
+    const result = await paidRes.json()
+    if (!paidRes.ok) throw new Error(result.error || `HTTP ${paidRes.status}`)
+    onStatus('Done — analysis complete.')
+    return result
+  }
+
+  // ── Wire button ────────────────────────────────────────────────────
+  const payButton = document.getElementById('payButton')
+  const payStatus = document.getElementById('payStatus')
+
+  if (!payButton) {
+    console.error('payButton not found in DOM')
+  } else {
+    payButton.addEventListener('click', async () => {
+      const tokenIn  = document.getElementById('payTokenIn').value.trim()
+      const tokenOut = document.getElementById('payTokenOut').value.trim()
+      const amount   = document.getElementById('payAmount').value.trim()
+
+      payButton.disabled = true
+      payStatus.style.color = 'var(--text-secondary)'
+
+      try {
+        const result = await payAndAnalyze({ tokenIn, tokenOut, amount }, (status) => {
+          payStatus.textContent = status
+        })
+        payStatus.textContent = `✓ ${result.recommendation} — impact ${Number(result.priceImpact || 0).toFixed(2)}%`
+        payStatus.style.color = 'var(--cyan)'
+      } catch (err) {
+        payStatus.textContent = `✗ ${err.message}`
+        payStatus.style.color = 'var(--red)'
+        console.error('[pay]', err)
+      } finally {
+        payButton.disabled = false
+      }
+    })
+    console.log('[spectra] pay button wired ✓')
+  }
+</script>
 </script>
 </body>
 </html>
