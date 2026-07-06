@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spectra · Routing Guard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #12161f;
+    --panel-raised: #171c28;
+    --border: #232838;
+    --text-primary: #e8eaf0;
+    --text-secondary: #8891a7;
+    --text-dim: #545c72;
+    --cyan: #35e7c6;
+    --violet: #8b5cf6;
+    --amber: #f5a623;
+    --red: #ff5470;
+
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(139, 92, 246, 0.10), transparent),
+      radial-gradient(ellipse 700px 400px at 100% 0%, rgba(53, 231, 198, 0.06), transparent);
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  a { color: var(--cyan); }
+
+  :focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+  }
+
+  .wrap {
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ────────────────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 4px 20px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .brand .mark {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.02em;
+    background: linear-gradient(120deg, var(--cyan), var(--violet));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .brand .sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--panel);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex: none;
+  }
+
+  .status-pill.live .dot {
+    background: var(--cyan);
+    box-shadow: 0 0 0 0 rgba(53, 231, 198, 0.6);
+    animation: pulse 2s infinite;
+  }
+
+  .status-pill.down .dot { background: var(--red); }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(53, 231, 198, 0.5); }
+    70%  { box-shadow: 0 0 0 8px rgba(53, 231, 198, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(53, 231, 198, 0); }
+  }
+
+  .rep {
+    text-align: right;
+  }
+
+  .rep .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+
+  .rep .value {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  /* ── Grid ──────────────────────────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: 300px 1fr 260px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  @media (max-width: 980px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text-dim);
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* ── Shield gauge (signature element) ─────────────────────────── */
+  .gauge-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .gauge-svg { width: 100%; max-width: 260px; }
+
+  .gauge-center {
+    position: absolute;
+    top: 46%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .gauge-value {
+    font-family: var(--font-mono);
+    font-size: 34px;
+    font-weight: 600;
+  }
+
+  .gauge-reco {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+    color: var(--text-secondary);
+  }
+
+  .needle {
+    transform-origin: 130px 130px;
+    transition: transform 0.6s cubic-bezier(.2,.9,.25,1);
+  }
+
+  .sweep {
+    transform-origin: 130px 130px;
+    animation: sweep 3.2s linear infinite;
+    opacity: 0.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sweep { animation: none; opacity: 0; }
+    .needle { transition: none; }
+    .status-pill.live .dot { animation: none; }
+  }
+
+  @keyframes sweep {
+    from { transform: rotate(-90deg); }
+    to   { transform: rotate(90deg); }
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .swatch { width: 7px; height: 7px; border-radius: 2px; }
+
+  .thresholds-note {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── Feed ──────────────────────────────────────────────────────── */
+  .feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 560px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .feed-list::-webkit-scrollbar { width: 6px; }
+  .feed-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .job {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--text-dim);
+    border-radius: 8px;
+    animation: enter 0.3s ease;
+  }
+
+  .job.proceed { border-left-color: var(--cyan); }
+  .job.caution { border-left-color: var(--amber); }
+  .job.blocked { border-left-color: var(--red); }
+
+  @keyframes enter {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .job-pair {
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  .job-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .job-impact {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    text-align: right;
+    min-width: 56px;
+  }
+
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .badge.proceed { color: var(--cyan); background: rgba(53, 231, 198, 0.12); }
+  .badge.caution { color: var(--amber); background: rgba(245, 166, 35, 0.12); }
+  .badge.blocked { color: var(--red); background: rgba(255, 84, 112, 0.12); }
+
+  .empty-state {
+    padding: 46px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .empty-state .glyph {
+    font-size: 22px;
+    display: block;
+    margin-bottom: 8px;
+    opacity: 0.6;
+  }
+
+  /* ── Stats column ──────────────────────────────────────────────── */
+  .stats-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .stat-tile {
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .stat-tile .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+
+  .stat-tile .stat-value {
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: 600;
+    margin-top: 3px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .sparkline {
+    margin-top: 10px;
+    width: 100%;
+    height: 40px;
+    display: block;
+  }
+
+  .identity {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    word-break: break-all;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <span class="mark">◆ SPECTRA</span>
+      <span class="sub">Routing Guard · Casper Testnet</span>
+    </div>
+    <div class="header-right">
+      <div class="status-pill down" id="statusPill">
+        <span class="dot"></span>
+        <span id="statusText">connecting…</span>
+      </div>
+      <div class="rep">
+        <div class="label">Reputation</div>
+        <div class="value" id="repScore">—</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- Shield gauge -->
+    <div class="panel">
+      <p class="panel-title">Price Impact Shield</p>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 260 170">
+          <defs>
+            <linearGradient id="idleGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#35e7c6" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.5"/>
+            </linearGradient>
+          </defs>
+          <!-- track -->
+          <path d="M 20 130 A 110 110 0 0 1 240 130" fill="none" stroke="#1c2130" stroke-width="14" stroke-linecap="round"/>
+          <!-- zones: safe / caution / block, arcs computed in JS via stroke-dasharray -->
+          <path id="zoneSafe"    d="M 20 130 A 110 110 0 0 1 240 130" fill="none" stroke="#35e7c6" stroke-width="14" stroke-linecap="butt" opacity="0.9"/>
+          <path id="zoneCaution" d="M 20 130 A 110 110 0 0 1 240 130" fill="none" stroke="#f5a623" stroke-width="14" stroke-linecap="butt" opacity="0.9"/>
+          <path id="zoneBlock"   d="M 20 130 A 110 110 0 0 1 240 130" fill="none" stroke="#ff5470" stroke-width="14" stroke-linecap="butt" opacity="0.9"/>
+          <!-- idle sweep -->
+          <g id="sweepGroup" class="sweep">
+            <line x1="130" y1="130" x2="130" y2="30" stroke="url(#idleGrad)" stroke-width="3"/>
+          </g>
+          <!-- needle -->
+          <g id="needleGroup" class="needle" style="transform: rotate(-90deg);"
+            <line x1="130" y1="130" x2="130" y2="36" stroke="#e8eaf0" stroke-width="3" stroke-linecap="round"/>
+          </g>
+          <circle cx="130" cy="130" r="6" fill="#e8eaf0"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-value" id="gaugeValue">0.00%</div>
+          <div class="gauge-reco" id="gaugeReco">awaiting trades</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--cyan)"></span>proceed</span>
+        <span><span class="swatch" style="background:var(--amber)"></span>caution</span>
+        <span><span class="swatch" style="background:var(--red)"></span>blocked</span>
+      </div>
+      <div class="thresholds-note" id="thresholdsNote">
+        warn ≥ 1.00% · block ≥ 5.00%
+      </div>
+    </div>
+
+    <!-- Live feed -->
+    <div class="panel">
+      <p class="panel-title">Live Routing Feed</p>
+      <div class="feed-list" id="feedList">
+        <div class="empty-state" id="emptyState">
+          <span class="glyph">◇</span>
+          No routing requests yet — Spectra is listening on <code>/route</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="panel">
+      <p class="panel-title">Agent Stats</p>
+      <div class="stats-stack">
+        <div class="stat-tile">
+          <div class="stat-row">
+            <div>
+              <div class="stat-label">Approved</div>
+              <div class="stat-value" id="statApproved" style="color:var(--cyan)">0</div>
+            </div>
+            <div>
+              <div class="stat-label">Blocked</div>
+              <div class="stat-value" id="statBlocked" style="color:var(--red)">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Total Jobs</div>
+          <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Block Rate</div>
+          <div class="stat-value" id="statBlockRate">0%</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Fees Earned</div>
+          <div class="stat-value" id="statFees">0.0000 CSPR</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Recent Price Impact</div>
+          <svg class="sparkline" id="sparkline" viewBox="0 0 200 40" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Agent Identity</div>
+          <div class="identity">
+            <div id="statAgentId">spectra-routing-guard-v1</div>
+            <div id="statWallet" style="margin-top:4px;color:var(--text-dim)">wallet: not set</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  let impactWarn = 1.0;
+  let impactBlock = 5.0;
+  const GAUGE_MAX_HEADROOM = 1.4; // scale ceiling as a multiple of impactBlock
+  const impactHistory = [];
+  const MAX_FEED = 50;
+  const MAX_SPARK = 24;
+
+  // ── Gauge geometry ──────────────────────────────────────────────
+  // Arc spans -90deg (value=0) to +90deg (value=gaugeMax) around (130,130) r=110
+  function angleForValue(v, maxV) {
+    const clamped = Math.max(0, Math.min(v, maxV));
+    return -90 + (clamped / maxV) * 180;
+  }
+
+  function polar(cx, cy, r, angleDeg) {
+    const a = (angleDeg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+
+  function arcPath(cx, cy, r, startAngle, endAngle) {
+    if (endAngle <= startAngle) return '';
+    const start = polar(cx, cy, r, startAngle);
+    const end = polar(cx, cy, r, endAngle);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+  }
+
+  function redrawZones() {
+    const gaugeMax = impactBlock * GAUGE_MAX_HEADROOM;
+    const warnAngle = angleForValue(impactWarn, gaugeMax);
+    const blockAngle = angleForValue(impactBlock, gaugeMax);
+
+    $('zoneSafe').setAttribute('d', arcPath(130, 130, 110, -90, warnAngle));
+    $('zoneCaution').setAttribute('d', arcPath(130, 130, 110, warnAngle, blockAngle));
+    $('zoneBlock').setAttribute('d', arcPath(130, 130, 110, blockAngle, 90));
+
+    $('thresholdsNote').textContent =
+      `warn ≥ ${impactWarn.toFixed(2)}% · block ≥ ${impactBlock.toFixed(2)}%`;
+  }
+
+  function setNeedle(value) {
+    const gaugeMax = impactBlock * GAUGE_MAX_HEADROOM;
+    const angle = angleForValue(value, gaugeMax);
+    $('needleGroup').style.transform = `rotate(${angle}deg)`;
+    $('needleGroup').style.transformOrigin = '130px 130px';
+  }
+
+  redrawZones();
+
+  // ── WebSocket ─────────────────────────────────────────────────────
+  let socket;
+  let reconnectDelay = 1000;
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    socket = new WebSocket(`${proto}://${location.host}`);
+
+    socket.addEventListener('open', () => {
+      reconnectDelay = 1000;
+      setStatus(true);
+    });
+
+    socket.addEventListener('close', () => {
+      setStatus(false);
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 1.6, 15000);
+    });
+
+    socket.addEventListener('error', () => socket.close());
+
+    socket.addEventListener('message', (evt) => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch { return; }
+      if (msg.type === 'status') applyStatus(msg);
+      else if (msg.type === 'job') applyJob(msg);
+    });
+  }
+
+  function setStatus(live) {
+    const pill = $('statusPill');
+    pill.classList.toggle('live', live);
+    pill.classList.toggle('down', !live);
+    $('statusText').textContent = live ? 'live' : 'reconnecting…';
+  }
+
+  function applyStatus(s) {
+    if (typeof s.impactWarn === 'number' && typeof s.impactBlock === 'number') {
+      impactWarn = s.impactWarn;
+      impactBlock = s.impactBlock;
+      redrawZones();
+    }
+    $('repScore').textContent = s.repScore ?? '—';
+    $('statApproved').textContent = s.routesApproved ?? 0;
+    $('statBlocked').textContent = s.routesBlocked ?? 0;
+    $('statTotal').textContent = s.totalJobs ?? 0;
+    $('statBlockRate').textContent = s.blockRate ?? '0%';
+    $('statFees').textContent = s.feesEarned ?? '0.0000 CSPR';
+    $('statAgentId').textContent = s.agentId ?? '—';
+    $('statWallet').textContent = 'wallet: ' + truncateKey(s.wallet);
+  }
+
+  function truncateKey(key) {
+    if (!key || key === 'not set') return 'not set';
+    return key.length > 16 ? `${key.slice(0, 8)}…${key.slice(-6)}` : key;
+  }
+
+  function applyJob(job) {
+    const impact = Number(job.priceImpact) || 0;
+    setNeedle(impact);
+    $('gaugeValue').textContent = impact.toFixed(2) + '%';
+    $('gaugeValue').style.color =
+      job.blocked ? 'var(--red)' : (job.warned ? 'var(--amber)' : 'var(--cyan)');
+    $('gaugeReco').textContent = job.recommendation || '—';
+
+    impactHistory.push(impact);
+    if (impactHistory.length > MAX_SPARK) impactHistory.shift();
+    drawSparkline();
+
+    renderFeedItem(job);
+  }
+
+  function renderFeedItem(job) {
+    const empty = $('emptyState');
+    if (empty) empty.remove();
+
+    const cls = job.blocked ? 'blocked' : (job.warned ? 'caution' : 'proceed');
+    const badgeLabel = job.blocked ? 'blocked' : (job.warned ? 'caution' : 'proceed');
+
+    const el = document.createElement('div');
+    el.className = `job ${cls}`;
+    el.innerHTML = `
+      <div>
+        <div class="job-pair">${escapeHtml(job.tokenIn || '?')} → ${escapeHtml(job.tokenOut || '?')}</div>
+        <div class="job-meta">amount ${formatAmount(job.amount)} · ${timeAgo(job.ts)}${
+          job.optimalSize && job.optimalSize !== job.amount ? ` · suggests ${formatAmount(job.optimalSize)}` : ''
+        }</div>
+      </div>
+      <div class="job-impact">${Number(job.priceImpact || 0).toFixed(2)}%</div>
+      <div class="badge ${cls}">${badgeLabel}</div>
+    `;
+
+    const list = $('feedList');
+    list.prepend(el);
+    while (list.children.length > MAX_FEED) list.removeChild(list.lastChild);
+  }
+
+  function drawSparkline() {
+    const svg = $('sparkline');
+    if (impactHistory.length < 2) { svg.innerHTML = ''; return; }
+    const w = 200, h = 40, pad = 4;
+    const max = Math.max(impactBlock, ...impactHistory, 0.01);
+    const step = (w - pad * 2) / (MAX_SPARK - 1);
+    const offset = (MAX_SPARK - impactHistory.length) * step;
+    const points = impactHistory.map((v, i) => {
+      const x = pad + offset + i * step;
+      const y = h - pad - (Math.min(v, max) / max) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--cyan)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+
+  function formatAmount(n) {
+    const num = Number(n);
+    if (!isFinite(num)) return String(n ?? '—');
+    return num >= 1000 ? num.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(num);
+  }
+
+  function timeAgo(ts) {
+    if (!ts) return 'just now';
+    const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (s < 5) return 'just now';
+    if (s < 60) return `${s}s ago`;
+    const m = Math.round(s / 60);
+    return `${m}m ago`;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  connect();
+})();
+</script>
+</body>
+</html>

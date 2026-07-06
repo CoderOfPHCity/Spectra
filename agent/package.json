@@ -1,0 +1,21 @@
+{
+  "name": "spectra-routing-guard-agent",
+  "version": "1.0.0",
+  "description": "Spectra RoutingGuardAgent — x402-gated price impact shield for CSPR.trade",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "casper-js-sdk": "^2.15.4",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

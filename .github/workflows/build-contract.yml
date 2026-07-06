@@ -1,0 +1,27 @@
+name: build-contract
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'contracts/agent-registry/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Build
+        working-directory: contracts/agent-registry
+        run: cargo build --release --target wasm32-unknown-unknown
+      - name: Strip debug sections
+        working-directory: contracts/agent-registry
+        run: |
+          sudo apt-get update && sudo apt-get install -y wabt || true
+          wasm-strip target/wasm32-unknown-unknown/release/agent-registry.wasm || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-registry-wasm
+          path: contracts/agent-registry/target/wasm32-unknown-unknown/release/agent-registry.wasm

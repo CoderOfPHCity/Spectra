@@ -1,0 +1,25 @@
+[package]
+name    = "agent-registry"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name    = "agent-registry"
+path    = "src/main.rs"
+bench   = false
+doctest = false
+test    = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+casper-contract = "=5.1.1"
+casper-types    = "=6.0.1"
+
+[profile.release]
+codegen-units   = 1
+lto             = true
+opt-level       = "z"
+panic           = "abort"
+overflow-checks = true

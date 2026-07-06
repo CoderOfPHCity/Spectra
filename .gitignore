@@ -1,0 +1,15 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Env / secrets
+.env
+*.pem
+keys/
+
+# Rust / Casper contract build output
+contracts/agent-registry/target/
+contracts/agent-registry/*.wasm
+
+# OS
+.DS_Store
