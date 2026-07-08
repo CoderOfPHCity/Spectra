@@ -10,12 +10,14 @@ bench   = false
 doctest = false
 test    = false
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
 casper-contract = "=5.1.1"
 casper-types    = "=6.0.1"
+
+# Held at pre-edition2024 releases so the tree resolves on the pinned
+# nightly (see rust-toolchain.toml). Newer versions need Rust 1.85+.
+base64ct = "=1.6.0"
+zeroize  = "=1.8.1"
 
 [profile.release]
 codegen-units   = 1

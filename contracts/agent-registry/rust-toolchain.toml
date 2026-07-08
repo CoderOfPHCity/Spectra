@@ -1,3 +1,5 @@
+# casper-contract 5.1.1 needs a pre-2025 nightly: newer rustc rejects its
+# #[no_mangle] lang items, older Cargo can't parse the edition2024 deps.
 [toolchain]
-channel = "stable"
+channel = "nightly-2024-10-15"
 targets = ["wasm32-unknown-unknown"]

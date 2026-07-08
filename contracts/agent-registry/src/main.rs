@@ -57,8 +57,8 @@ use casper_types::{
     account::AccountHash,
     bytesrepr::{self, FromBytes, ToBytes},
     contracts::NamedKeys,
-    CLType, CLTyped, CLValue, EntryPoint, EntryPointAccess, EntryPointType, EntryPoints, Key,
-    Parameter, RuntimeArgs, URef, U512,
+    CLType, CLTyped, CLValue, EntityEntryPoint, EntryPointAccess, EntryPointPayment,
+    EntryPointType, EntryPoints, Key, Parameter, RuntimeArgs, URef, U512,
 };
 
 // ── Named-key / dictionary constants ─────────────────────────────────────────
@@ -362,15 +362,16 @@ pub extern "C" fn agent_count() {
 fn build_entry_points() -> EntryPoints {
     let mut entry_points = EntryPoints::new();
 
-    entry_points.add_entry_point(EntryPoint::new(
+    entry_points.add_entry_point(EntityEntryPoint::new(
         EP_INIT,
         vec![],
         CLType::Unit,
         EntryPointAccess::Public,
-        EntryPointType::Contract,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
     ));
 
-    entry_points.add_entry_point(EntryPoint::new(
+    entry_points.add_entry_point(EntityEntryPoint::new(
         EP_REGISTER_AGENT,
         vec![
             Parameter::new(ARG_AGENT_ID, CLType::String),
@@ -379,10 +380,11 @@ fn build_entry_points() -> EntryPoints {
         ],
         CLType::Unit,
         EntryPointAccess::Public,
-        EntryPointType::Contract,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
     ));
 
-    entry_points.add_entry_point(EntryPoint::new(
+    entry_points.add_entry_point(EntityEntryPoint::new(
         EP_UPDATE_REPUTATION,
         vec![
             Parameter::new(ARG_AGENT_ID, CLType::String),
@@ -391,18 +393,20 @@ fn build_entry_points() -> EntryPoints {
         ],
         CLType::Unit,
         EntryPointAccess::Public,
-        EntryPointType::Contract,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
     ));
 
-    entry_points.add_entry_point(EntryPoint::new(
+    entry_points.add_entry_point(EntityEntryPoint::new(
         EP_DEACTIVATE_AGENT,
         vec![Parameter::new(ARG_AGENT_ID, CLType::String)],
         CLType::Unit,
         EntryPointAccess::Public,
-        EntryPointType::Contract,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
     ));
 
-    entry_points.add_entry_point(EntryPoint::new(
+    entry_points.add_entry_point(EntityEntryPoint::new(
         EP_WITHDRAW_STAKE,
         vec![
             Parameter::new(ARG_AGENT_ID, CLType::String),
@@ -410,23 +414,26 @@ fn build_entry_points() -> EntryPoints {
         ],
         CLType::Unit,
         EntryPointAccess::Public,
-        EntryPointType::Contract,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
     ));
 
-    entry_points.add_entry_point(EntryPoint::new(
+    entry_points.add_entry_point(EntityEntryPoint::new(
         EP_GET_AGENT,
         vec![Parameter::new(ARG_AGENT_ID, CLType::String)],
         CLType::Any,
         EntryPointAccess::Public,
-        EntryPointType::Contract,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
     ));
 
-    entry_points.add_entry_point(EntryPoint::new(
+    entry_points.add_entry_point(EntityEntryPoint::new(
         EP_AGENT_COUNT,
         vec![],
         CLType::U64,
         EntryPointAccess::Public,
-        EntryPointType::Contract,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
     ));
 
     entry_points
@@ -442,6 +449,7 @@ pub extern "C" fn call() {
         Some(named_keys),
         Some(PACKAGE_HASH_KEY.to_string()),
         Some(ACCESS_UREF_KEY.to_string()),
+        None, // no message topics
     );
 
     runtime::put_key(CONTRACT_HASH_KEY, Key::from(contract_hash));
