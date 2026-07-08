@@ -10,12 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - name: Build
+      # rustup reads contracts/agent-registry/rust-toolchain.toml and installs
+      # the pinned nightly + wasm target — single source of truth for the toolchain.
+      - name: Build wasm
         working-directory: contracts/agent-registry
-        run: cargo build --release --target wasm32-unknown-unknown
+        run: |
+          rustup show
+          cargo build --release --target wasm32-unknown-unknown --locked
       - name: Strip debug sections
         working-directory: contracts/agent-registry
         run: |
