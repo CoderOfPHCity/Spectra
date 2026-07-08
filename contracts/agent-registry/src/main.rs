@@ -143,7 +143,7 @@ impl ToBytes for AgentRecord {
         Ok(result)
     }
 
-    fn serialized_length(&self) -> usize {
+    fn serialized_length(&self) -> usize { 
         self.owner.serialized_length()
             + self.stake_motes.serialized_length()
             + self.total_jobs.serialized_length()

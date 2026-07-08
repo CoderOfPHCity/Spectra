@@ -66,7 +66,7 @@ with.
 
 ## What's deliberately out of scope for this MVP
 
-- **No yield-monitor agent / LP reallocation.** The decision doc scoped
+- **No yield-monitor agent / LP reallocation.** The doc scoped
   this down to a single agent (Routing Guard). `optimal_liquidity_amounts`
   and the LP-related MCP tools are **under development**.
 - **No private key handling for end users.** Users pay via their own
